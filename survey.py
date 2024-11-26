@@ -6,13 +6,13 @@ from discretemap import *
 
 # Parameters
 grid_size = (100, 100)  # Size of the map
-lidar_range = 15  # LiDAR scan range
-robot_pos = [10, 10]  # Starting position of the robot
-frames = 1000  # Maximum simulation steps
+lidar_range = 15        # LiDAR scan range
+robot_pos = [10, 10]    # Starting position of the robot
+frames = 1000           # Maximum simulation steps
 
 # Add a solid vertical wall dividing the space
-#wall_x = grid_size[0] // 2
-#environment[wall_x, :] = 1  # Impassable wall
+# wall_x = grid_size[0] // 2
+# environment[wall_x, :] = 1  # Impassable wall
 
 # Simulate LiDAR scan within a circular radius
 def simulate_lidar(environment, robot_pos, lidar_range):
@@ -77,24 +77,24 @@ def bfs(visible_map, start):
 
 dmap = DiscreteMap(sys.argv[1], 5)
 # Expand the obstacles by half the obstacle's radius (radius = 0.35)
-#dmap.expand_obstacles(0.175)
+# dmap.expand_obstacles(0.175)
 
 grid_size = (dmap.grid_width, dmap.grid_height)
 # Initialize environment and visible map
 environment = np.zeros(grid_size)  # Ground truth map (0 = free space, 1 = obstacle)
 visible_map = np.full(grid_size, -1)  # Visible map (-1 = unexplored)
 
-#print(dmap.start)
+# print(dmap.start)
 robot_pos = dmap.start
 
-#mask = np.array(dmap.occupied).transpose()
-#environment[mask] = 1
+# mask = np.array(dmap.occupied).transpose()
+# environment[mask] = 1
 
 x_coords = [c[0] for c in dmap.occupied]
 y_coords = [c[1] for c in dmap.occupied]
 environment[x_coords, y_coords] = 1
 
-#for p in dmap.occupied:
+# for p in dmap.occupied:
 #    print(p)
 
 path = []
