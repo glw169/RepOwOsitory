@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
+import random
+import math
 
 from discretemap import *
 
@@ -8,6 +10,7 @@ from discretemap import *
 grid_size = (100, 100)  # Size of the map
 lidar_range = 15  # LiDAR scan range
 robot_pos = [10, 10]  # Starting position of the robot
+abs_robot_pos = robot_pos
 frames = 1000  # Maximum simulation steps
 
 # Add a solid vertical wall dividing the space
@@ -74,18 +77,61 @@ def bfs(visible_map, start):
     print("No unexplored areas accessible.")
     return None  # No path found
 
+def update_position(start, abs_start, end, motion_error=0):
+    global local_map
+    delta_x, delta_y = end[0] - start[0], end[1] - start[1]
+
+    local_map = np.roll(local_map, (delta_x*-1, delta_y*-1), axis=(0,1))
+
+    if motion_error == 0:
+        return end, end
+    
+    if random.random() > motion_error:
+        return end, (abs_start[0] + delta_x, abs_start[1] + delta_y)
+    
+    if delta_x != 0 and delta_y == 0:
+        delta = random.choice([(delta_x, 0), (delta_x, 1), (delta_x, -1)])
+        return end, (abs_start[0] + delta[0], abs_start[1] + delta[1])
+    
+    if delta_y != 0 and delta_x == 0:
+        delta = random.choice([(0, delta_y), (1, delta_y), (-1, delta_y)])
+        return end, (abs_start[0] + delta[0], abs_start[1] + delta[1])
+    
+    delta = random.choice([(delta_x, 0), (0, delta_y), (delta_x, delta_y)])
+    return end, (abs_start[0] + delta[0], abs_start[1] + delta[1])
+    
+     
+def update_local_map(scan, robot_pos, lidar_error=0):
+    global grid_size
+    global environment
+
+    center_scan = [(p[0]-robot_pos[0]+(grid_size[0] + grid_size[0]//2), p[1]-robot_pos[1]+(grid_size[1] + grid_size[1]//2)) for p in scan]
+
+    for i in range(len(center_scan)):
+        local_map[center_scan[i]] = environment[scan[i]]
+
+
+def correct_motion_uncertainty(robot_pos, abs_pos, scan):
+
+    calc_abs_pos = abs_pos #TODO: calc concentric center of lidar scan
+    eliminated_error = abs(math.dist(calc_abs_pos, robot_pos))
+    remaining_error = abs(math.dist(calc_abs_pos, abs_pos))
+    print(f"Eliminated error: {eliminated_error}, Remaining error: {remaining_error}")
+    return calc_abs_pos
 
 dmap = DiscreteMap(sys.argv[1], 5)
 # Expand the obstacles by half the obstacle's radius (radius = 0.35)
 #dmap.expand_obstacles(0.175)
 
 grid_size = (dmap.grid_width, dmap.grid_height)
+local_map = np.full((grid_size[0]*3, grid_size[1]*3), -1)
 # Initialize environment and visible map
 environment = np.zeros(grid_size)  # Ground truth map (0 = free space, 1 = obstacle)
 visible_map = np.full(grid_size, -1)  # Visible map (-1 = unexplored)
 
 #print(dmap.start)
 robot_pos = dmap.start
+abs_robot_pos = robot_pos
 
 #mask = np.array(dmap.occupied).transpose()
 #environment[mask] = 1
@@ -100,40 +146,54 @@ environment[x_coords, y_coords] = 1
 path = []
 # Simulation loop with debugging
 for step in range(frames):
-    print(f"Step {step}: Robot position: {robot_pos}")
+    print(f"Step {step}: Robot position: {robot_pos}, Absolute position: {abs_robot_pos}")
     
     # Simulate LiDAR scan
-    lidar_scan = simulate_lidar(environment, robot_pos, lidar_range)
+    lidar_scan = simulate_lidar(environment, abs_robot_pos, lidar_range)
     print(f"LiDAR scan detected {len(lidar_scan)} points.")
-    
+
+    #TODO: find concentric center of points from LiDAR scan to correct motion uncertainty
+    #TODO: color motion uncertainty corrections
+        
     # Update the visible map
     update_map(visible_map, lidar_scan)
+    update_local_map(lidar_scan, robot_pos)
     
     # Plan path to nearest unexplored area
     path = bfs(visible_map, robot_pos)
     if path is None:
         print("No more unexplored areas accessible. Stopping simulation.")
         break
+    if len(path) == 1:
+        print("Crashed")
+        break
     
     # Move the robot along the path
-    robot_pos = path[1]  # Move to the next step in the path
+    robot_pos, abs_robot_pos = update_position(robot_pos, abs_robot_pos, path[1], motion_error=1)
+    #TODO: have an if run this every X steps to see a gradient of motion improvement
+    robot_pos = correct_motion_uncertainty(robot_pos, abs_robot_pos, lidar_scan)
+    #robot_pos = path[1]  # Move to the next step in the path
     print(f"Moving robot to: {robot_pos}")
     
     # Visualization
-    plt.imshow(visible_map, cmap='gray')
-    plt.scatter(robot_pos[1], robot_pos[0], c='red', s=10, label='Robot')
+    img = np.concatenate((visible_map, local_map[grid_size[0] : 2*grid_size[0], grid_size[1] : 2*grid_size[1]]), axis=1)
+    plt.imshow(img, cmap='gray')
+    plt.scatter([abs_robot_pos[1], (grid_size[0]//2)+grid_size[0]], [abs_robot_pos[0], grid_size[1]//2], c='red', s=10, label='Abs Robot')
+    plt.scatter(robot_pos[1], robot_pos[0], c='purple', s=10, label='Robot')
     plt.legend()
     plt.title(f"Step {step + 1}")
-    plt.pause(0.001)
+    plt.pause(0.1)
     plt.clf()
+
 else:
     print("Maximum simulation step reached. Terminating")
 
     x_coords = [c[0] for c in path]
     y_coords = [c[1] for c in path]
     visible_map[x_coords, y_coords] = 0.5
+    img = np.concatenate((visible_map, local_map[grid_size[0] : 2*grid_size[0], grid_size[1] : 2*grid_size[1]]), axis=1)
 
-plt.imshow(visible_map, cmap='gray')
+plt.imshow(img, cmap='gray')
 plt.pause(10)
 
 print("Simulation complete.")
