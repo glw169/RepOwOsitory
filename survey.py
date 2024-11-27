@@ -9,7 +9,8 @@ import random
 frames = 1000  # Maximum simulation steps
 lidar_range = 15  # LiDAR range in grid cells
 angle_resolution = 45  # Reduced angle resolution for LiDAR
-buffer_radius = 1  # Reduced buffer zone around obstacles
+buffer_radius = 1  # Buffer zone radius around obstacles
+buffer_penalty = 10  # Penalty for moving through buffer zones
 unreachable_targets = set()  # Track unreachable frontiers
 max_stuck_attempts = 5  # Max retries before random movement
 
@@ -33,12 +34,17 @@ robot_pose = np.array([dmap.start[0], dmap.start[1], 0.0])  # x, y, theta
 
 # Inflate obstacles to create buffer zones around walls
 def inflate_obstacles(map_data, radius):
-    from scipy.ndimage import binary_dilation
-    obstacles = (map_data == 1)
-    buffer_zone = binary_dilation(obstacles, iterations=radius).astype(int)
-    inflated_map = np.where(buffer_zone, 2, map_data)
-    inflated_map[map_data == 1] = 1  # Keep walls as 1
-    return inflated_map
+    rows, cols = map_data.shape
+    inflated = map_data.copy()
+    for x in range(rows):
+        for y in range(cols):
+            if map_data[x, y] == 1:  # Wall detected
+                for dx in range(-radius, radius + 1):
+                    for dy in range(-radius, radius + 1):
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < rows and 0 <= ny < cols and inflated[nx, ny] != 1:
+                            inflated[nx, ny] = 2  # Mark as buffer zone
+    return inflated
 
 # Simulate LiDAR scan
 def simulate_lidar(environment, robot_pos, lidar_range, angle_resolution):
@@ -74,8 +80,8 @@ def update_map(visible_map, lidar_scan):
     )
     return inflate_obstacles(visible_map, buffer_radius)
 
-# A* Pathfinding
-def astar(visible_map, start, goal):
+# Weighted A* Pathfinding
+def weighted_astar(visible_map, start, goal, buffer_penalty):
     rows, cols = visible_map.shape
     queue = PriorityQueue()
     queue.put((0, start))
@@ -92,8 +98,15 @@ def astar(visible_map, start, goal):
 
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nx, ny = current[0] + dx, current[1] + dy
-            if 0 <= nx < rows and 0 <= ny < cols and visible_map[nx, ny] != 1 and visible_map[nx, ny] != 2:
-                new_cost = cost_so_far[current] + 1
+            if 0 <= nx < rows and 0 <= ny < cols:
+                # Add penalty for buffer zones
+                if visible_map[nx, ny] == 2:  # Buffer zone
+                    new_cost = cost_so_far[current] + 1 + buffer_penalty
+                elif visible_map[nx, ny] != 1:  # Free space
+                    new_cost = cost_so_far[current] + 1
+                else:
+                    continue  # Skip walls
+
                 if (nx, ny) not in cost_so_far or new_cost < cost_so_far[(nx, ny)]:
                     cost_so_far[(nx, ny)] = new_cost
                     priority = new_cost + abs(nx - goal[0]) + abs(ny - goal[1])
@@ -150,7 +163,7 @@ for step in range(frames):
         break
 
     print(f"Target position: {target}")
-    path = astar(visible_map, (int(robot_pose[0]), int(robot_pose[1])), target)
+    path = weighted_astar(visible_map, (int(robot_pose[0]), int(robot_pose[1])), target, buffer_penalty)
 
     if path is None:
         print(f"Target {target} is unreachable. Marking as unreachable.")
