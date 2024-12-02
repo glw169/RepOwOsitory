@@ -4,6 +4,7 @@ from discretemap import *
 import sys
 from queue import PriorityQueue
 import random
+import matplotlib.patches as patches
 
 # Parameters
 frames = 1000  # Maximum simulation steps
@@ -147,11 +148,20 @@ def find_nearest_frontier(visible_map, robot_pos):
                     visited.add((nx, ny))
     return None  # No frontier found
 
+def draw_lidar_fov(ax, robot_pose, lidar_scan):
+    fov_points = [(robot_pose[1], robot_pose[0])]  # Start with the robot's position
+    for (x, y) in lidar_scan:
+        fov_points.append((y, x))  # Append each LiDAR scan point
+    fov_patch = patches.Polygon(fov_points, closed=True, color='green', alpha=0.3)
+    ax.add_patch(fov_patch)
+
+
 # Initialize the figure for side-by-side plots
 fig, axs = plt.subplots(1, 2, figsize=(12, 6))
 
 # Main SLAM loop
 stuck_count = 0
+final_map = None  # Placeholder for the final map
 for step in range(frames):
     print(f"Step {step}: Robot pose: {robot_pose}")
     lidar_scan = simulate_lidar(environment, robot_pose[:2], lidar_range, angle_resolution)
@@ -160,6 +170,7 @@ for step in range(frames):
     target = find_nearest_frontier(visible_map, robot_pose)
     if target is None:
         print("Exploration complete.")
+        final_map = visible_map.copy()
         break
 
     print(f"Target position: {target}")
@@ -188,13 +199,10 @@ for step in range(frames):
     axs[0].imshow(visible_map, cmap='gray', origin='lower')
     axs[0].scatter(robot_pose[1], robot_pose[0], c='red', s=10, label='Robot')
 
-    # Draw LiDAR lines
-    for (x, y) in lidar_scan:
-        dx = y - robot_pose[1]
-        dy = x - robot_pose[0]
-        axs[0].arrow(robot_pose[1], robot_pose[0], dx, dy, head_width=1, color='cyan', alpha=0.6)
+    # Visualize the LiDAR FOV
+    draw_lidar_fov(axs[0], robot_pose, lidar_scan)
 
-    axs[0].set_title("Robot with LiDAR Scans (Static)")
+    axs[0].set_title("Robot with LiDAR FOV (Static)")
     axs[0].legend()
 
     # Right plot: Robot moving to the target (Centered on Robot)
@@ -211,4 +219,16 @@ for step in range(frames):
     # Refresh plots
     plt.pause(0.001)
 
-plt.show()
+# Remove buffer zones from the final map
+if final_map is not None:
+    final_map[final_map == 2] = 0  # Convert buffer zones to free space
+
+    # Invert the color representation: 1 (wall) -> black, 0 (free) -> white
+    display_map = np.where(final_map == 1, 0, 1)  # Wall = 0 (black), Free = 1 (white)
+
+    # Display the final map
+    plt.figure(figsize=(6, 6))
+    plt.imshow(display_map, cmap='gray', origin='lower')
+    plt.title("Final Map (Black = Wall, White = Free Space)")
+    plt.axis('off')  # Turn off axes for cleaner visualization
+    plt.show()
