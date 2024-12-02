@@ -8,7 +8,7 @@ import random
 # Parameters
 frames = 1000  # Maximum simulation steps
 lidar_range = 15  # LiDAR range in grid cells
-angle_resolution = 45  # Reduced angle resolution for LiDAR
+angle_resolution = 60  # Reduced angle resolution for LiDAR
 buffer_radius = 1  # Buffer zone radius around obstacles
 buffer_penalty = 10  # Penalty for moving through buffer zones
 unreachable_targets = set()  # Track unreachable frontiers
@@ -184,25 +184,31 @@ for step in range(frames):
     axs[0].clear()
     axs[1].clear()
 
-    # Left plot: Robot with LiDAR scans
+    # Left plot: Robot with LiDAR scans (Static View)
     axs[0].imshow(visible_map, cmap='gray', origin='lower')
     axs[0].scatter(robot_pose[1], robot_pose[0], c='red', s=10, label='Robot')
-    axs[0].scatter(target[1], target[0], c='blue', s=50, marker='x', label='Target')
+
+    # Draw LiDAR lines
     for (x, y) in lidar_scan:
         dx = y - robot_pose[1]
         dy = x - robot_pose[0]
         axs[0].arrow(robot_pose[1], robot_pose[0], dx, dy, head_width=1, color='cyan', alpha=0.6)
 
-    # Right plot: Robot moving to the target
+    axs[0].set_title("Robot with LiDAR Scans (Static)")
+    axs[0].legend()
+
+    # Right plot: Robot moving to the target (Centered on Robot)
     axs[1].imshow(visible_map, cmap='gray', origin='lower')
     axs[1].scatter(robot_pose[1], robot_pose[0], c='red', s=10, label='Robot')
     axs[1].scatter(target[1], target[0], c='blue', s=50, marker='x', label='Target')
 
+    # Center the camera on the robot
+    axs[1].set_xlim([robot_pose[1] - lidar_range, robot_pose[1] + lidar_range])
+    axs[1].set_ylim([robot_pose[0] - lidar_range, robot_pose[0] + lidar_range])
+    axs[1].set_title("Robot Moving to Target (Centered)")
+    axs[1].legend()
+
     # Refresh plots
-    axs[0].set_title("Robot with LiDAR Scans")
-    axs[1].set_title("Robot Moving to Target")
-    for ax in axs:
-        ax.legend()
     plt.pause(0.001)
 
 plt.show()
