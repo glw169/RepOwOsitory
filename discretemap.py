@@ -318,5 +318,3 @@ class DiscreteMap():
         display_im.save(sname)
         del draw
         del display_im
-
-    
