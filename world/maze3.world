@@ -63,5 +63,5 @@ define turtlebot position
 
 )
 
-turtlebot( pose [-6 6 0 0] color "red")
+turtlebot( pose [50 50 0 0] color "red")
 block( pose [-2 6 5 0] color "green")
