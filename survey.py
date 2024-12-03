@@ -25,7 +25,8 @@ grid_size = (dmap.grid_width, dmap.grid_height)
 local_map = np.full((grid_size[0]*3, grid_size[1]*3), -1)
 local_map_path = np.zeros((grid_size[0]*3, grid_size[1]*3))
 abs_map_path = np.zeros(grid_size)
-local_map_plan = np.full(grid_size, -1)
+uncertainty_padding = 20
+local_map_plan = np.full((grid_size[0]+uncertainty_padding*2, grid_size[1]+uncertainty_padding*2), -1)
 
 # Initialize environment and visible map
 environment = np.zeros(grid_size)  # Ground truth map (0 = free space, 1 = obstacle)
@@ -60,7 +61,7 @@ def update_map(visible_map, lidar_scan):
     for x, y in lidar_scan:
         if visible_map[x, y] == -1:
             visible_map[x, y] = 0  # Mark as free space
-    for x, y in lidar_scan:
+        
         if environment[x, y] == 1:
             visible_map[x, y] = 1  # Mark as obstacle
 
@@ -96,20 +97,7 @@ def bfs(visible_map, start):
                 parent[(nx, ny)] = current  # Track parent node
     
     print("No unexplored areas accessible.")
-    return None
-
-def store_paths(start, abs_start, end):
-    global local_map_path
-    global abs_map_path
-
-    delta_x, delta_y = end[0] - start[0], end[1] - start[1]
-    center = (grid_size[0] + grid_size[0]//2, grid_size[1] + grid_size[1]//2)
-    local_map_path[center] = 2
-    local_map_path = np.roll(local_map, (delta_x*-1, delta_y*-1), axis=(0,1))
-    local_map_path[center] = 2
-
-    abs_map_path[abs_start] = 2
-    abs_map_path[end] = 2
+    return None  # No path found
 
 def update_position(start, abs_start, end, motion_error=0):
     global local_map
@@ -144,7 +132,7 @@ def update_position(start, abs_start, end, motion_error=0):
     delta = random.choice(potential_moves)
     return end, (abs_start[0] + delta[0], abs_start[1] + delta[1])
     
-def update_local_map(scan, robot_pos, lidar_error=0):
+def update_local_map(scan, robot_pos, abs_robot_pos, lidar_error=0):
     global grid_size
     global environment
 
@@ -153,9 +141,14 @@ def update_local_map(scan, robot_pos, lidar_error=0):
     for i in range(len(center_scan)):
         local_map[center_scan[i]] = environment[scan[i]]
 
+    offset_x = robot_pos[0] - abs_robot_pos[0]
+    offset_y = robot_pos[1] - abs_robot_pos[1]
+    for x, y in scan:
+        local_map_plan[uncertainty_padding + offset_x + x][uncertainty_padding + offset_y + y] = environment[x][y]
+
 def correct_motion_uncertainty(robot_pos, abs_pos, scan):
 
-    calc_abs_pos = abs_pos
+    calc_abs_pos = abs_pos #TODO: calc concentric center of lidar scan
     eliminated_error = abs(math.dist(calc_abs_pos, robot_pos))
     remaining_error = abs(math.dist(calc_abs_pos, abs_pos))
     print(f"Eliminated error: {eliminated_error}, Remaining error: {remaining_error}")
@@ -172,7 +165,6 @@ for step in range(frames):
 
     # Update the visible map
     update_map(visible_map, lidar_scan)
-    update_local_map(lidar_scan, robot_pos)
     
     # Plan path to nearest unexplored area
     path = bfs(visible_map, robot_pos)
@@ -184,8 +176,8 @@ for step in range(frames):
         break
     
     # Move the robot along the path
-    robot_pos, abs_robot_pos = update_position(robot_pos, abs_robot_pos, path[1], motion_error=0.2)
-    store_paths(robot_pos, abs_robot_pos, path[1])
+    robot_pos, abs_robot_pos = update_position(robot_pos, abs_robot_pos, path[1], motion_error=0.5)
+    update_local_map(lidar_scan, robot_pos, abs_robot_pos)
     robot_pos = correct_motion_uncertainty(robot_pos, abs_robot_pos, lidar_scan)
     print(f"Moving robot to: {robot_pos}")
     
