@@ -7,7 +7,6 @@ import math
 
 from discretemap import *
 
-# Parameters
 grid_size = (100, 100)  # Size of the map
 lidar_range = 15  # LiDAR scan range
 robot_pos = [10, 10]  # Starting position of the robot
@@ -21,25 +20,17 @@ colors = ['black', 'blue', 'lightgray', 'white']
 cmap = ListedColormap(colors)
 
 dmap = DiscreteMap(sys.argv[1], 5)
-# Expand the obstacles by half the obstacle's radius (radius = 0.35)
-#dmap.expand_obstacles(0.175)
 
 grid_size = (dmap.grid_width, dmap.grid_height)
 local_map = np.full((grid_size[0]*3, grid_size[1]*3), -1)
-#local_map_path = np.zeros((grid_size[0]*3, grid_size[1]*3))
-#abs_map_path = np.zeros(grid_size)
 local_map_plan = np.full(grid_size, -1)
 
 # Initialize environment and visible map
 environment = np.zeros(grid_size)  # Ground truth map (0 = free space, 1 = obstacle)
 visible_map = np.full(grid_size, -1)  # Visible map (-1 = unexplored)
 
-#print(dmap.start)
 robot_pos = dmap.start
 abs_robot_pos = robot_pos
-
-#mask = np.array(dmap.occupied).transpose()
-#environment[mask] = 1
 
 x_coords = [c[0] for c in dmap.occupied]
 y_coords = [c[1] for c in dmap.occupied]
@@ -107,7 +98,7 @@ def bfs(visible_map, start):
                 parent[(nx, ny)] = current  # Track parent node
     
     print("No unexplored areas accessible.")
-    return None  # No path found
+    return None
 
 def store_paths(start, abs_start, end):
     global local_map_path
@@ -155,7 +146,6 @@ def update_position(start, abs_start, end, motion_error=0):
     delta = random.choice(potential_moves)
     return end, (abs_start[0] + delta[0], abs_start[1] + delta[1])
     
-     
 def update_local_map(scan, robot_pos, lidar_error=0):
     global grid_size
     global environment
@@ -164,7 +154,6 @@ def update_local_map(scan, robot_pos, lidar_error=0):
 
     for i in range(len(center_scan)):
         local_map[center_scan[i]] = environment[scan[i]]
-
 
 def correct_motion_uncertainty(robot_pos, abs_pos, scan):
 
@@ -219,11 +208,6 @@ for step in range(frames):
 
 else:
     print("Maximum simulation step reached. Terminating")
-
-    #x_coords = [c[0] for c in path]
-    #y_coords = [c[1] for c in path]
-    #visible_map[x_coords, y_coords] = 0.5
-    #img = np.concatenate((visible_map, local_map[grid_size[0] : 2*grid_size[0], grid_size[1] : 2*grid_size[1]]), axis=1)
 
 plt.imshow(visible_map, cmap=cmap)
 plt.pause(5)
