@@ -231,4 +231,5 @@ plt.pause(5)
 plt.imshow(local_map, cmap=cmap)
 plt.pause(5)
 
+
 print("Simulation complete.")
