@@ -155,7 +155,7 @@ def update_local_map(scan, robot_pos, lidar_error=0):
 
 def correct_motion_uncertainty(robot_pos, abs_pos, scan):
 
-    calc_abs_pos = abs_pos #TODO: calc concentric center of lidar scan
+    calc_abs_pos = abs_pos
     eliminated_error = abs(math.dist(calc_abs_pos, robot_pos))
     remaining_error = abs(math.dist(calc_abs_pos, abs_pos))
     print(f"Eliminated error: {eliminated_error}, Remaining error: {remaining_error}")
@@ -170,9 +170,6 @@ for step in range(frames):
     lidar_scan = simulate_lidar(environment, abs_robot_pos, lidar_range)
     print(f"LiDAR scan detected {len(lidar_scan)} points.")
 
-    #TODO: find concentric center of points from LiDAR scan to correct motion uncertainty
-    #TODO: color motion uncertainty corrections
-        
     # Update the visible map
     update_map(visible_map, lidar_scan)
     update_local_map(lidar_scan, robot_pos)
@@ -189,9 +186,7 @@ for step in range(frames):
     # Move the robot along the path
     robot_pos, abs_robot_pos = update_position(robot_pos, abs_robot_pos, path[1], motion_error=0.2)
     store_paths(robot_pos, abs_robot_pos, path[1])
-    #TODO: have an if run this every X steps to see a gradient of motion improvement
     robot_pos = correct_motion_uncertainty(robot_pos, abs_robot_pos, lidar_scan)
-    #robot_pos = path[1]  # Move to the next step in the path
     print(f"Moving robot to: {robot_pos}")
     
     # Visualization
