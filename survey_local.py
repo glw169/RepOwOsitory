@@ -217,10 +217,14 @@ for step in range(frames):
     
     # Visualization
     img = np.concatenate((visible_map, local_map[grid_size[0] : 2*grid_size[0], grid_size[1] : 2*grid_size[1]]), axis=1)
-    plt.imshow(img, cmap=cmap)
-    plt.scatter([abs_robot_pos[1], (grid_size[0]//2)+grid_size[0]], [abs_robot_pos[0], grid_size[1]//2], c='red', s=10, label='Abs Robot')
-    plt.scatter(robot_pos[1], robot_pos[0], c='purple', s=10, label='Robot')
-    plt.legend()
+    #img = np.concatenate((img, local_map_plan), axis=1)
+
+    #plt.imshow(img, cmap=cmap)
+    #plt.scatter([abs_robot_pos[1], (grid_size[0]//2)+grid_size[0]], [abs_robot_pos[0], grid_size[1]//2], c='red', s=10, label='Abs Robot')
+    #plt.scatter(robot_pos[1], robot_pos[0], c='purple', s=10, label='Robot')
+    plt.imshow(local_map_plan, cmap=cmap)
+    plt.scatter(abs_robot_pos[1]+uncertainty_padding, abs_robot_pos[0]+uncertainty_padding, c='purple', s=10)
+    #plt.legend()
     plt.title(f"Step {step + 1}")
     plt.pause(0.1)
     plt.clf()
