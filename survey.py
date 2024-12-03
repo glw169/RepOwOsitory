@@ -26,8 +26,8 @@ dmap = DiscreteMap(sys.argv[1], 5)
 
 grid_size = (dmap.grid_width, dmap.grid_height)
 local_map = np.full((grid_size[0]*3, grid_size[1]*3), -1)
-#local_map_path = np.zeros((grid_size[0]*3, grid_size[1]*3))
-#abs_map_path = np.zeros(grid_size)
+local_map_path = np.zeros((grid_size[0]*3, grid_size[1]*3))
+abs_map_path = np.zeros(grid_size)
 local_map_plan = np.full(grid_size, -1)
 
 # Initialize environment and visible map
