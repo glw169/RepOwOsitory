@@ -9,7 +9,7 @@ import matplotlib.patches as patches
 # Parameters
 frames = 1000  # Maximum simulation steps
 lidar_range = 15  # LiDAR range in grid cells
-angle_resolution = 60  # Reduced angle resolution for LiDAR
+angle_resolution = 360  # Reduced angle resolution for LiDAR
 buffer_radius = 1  # Buffer zone radius around obstacles
 buffer_penalty = 10  # Penalty for moving through buffer zones
 unreachable_targets = set()  # Track unreachable frontiers
@@ -202,7 +202,8 @@ for step in range(frames):
     # Visualize the LiDAR FOV
     draw_lidar_fov(axs[0], robot_pose, lidar_scan)
 
-    axs[0].set_title("Robot with LiDAR FOV (Static)")
+    axs[0].set_title("Robot with LiDAR Scan")
+    axs[0].scatter([], [], color='green', s=10, label='LiDAR Scan')
     axs[0].legend()
 
     # Right plot: Robot moving to the target (Centered on Robot)
@@ -213,7 +214,7 @@ for step in range(frames):
     # Center the camera on the robot
     axs[1].set_xlim([robot_pose[1] - lidar_range, robot_pose[1] + lidar_range])
     axs[1].set_ylim([robot_pose[0] - lidar_range, robot_pose[0] + lidar_range])
-    axs[1].set_title("Robot Moving to Target (Centered)")
+    axs[1].set_title("Robot Moving to Target")
     axs[1].legend()
 
     # Refresh plots
@@ -229,6 +230,6 @@ if final_map is not None:
     # Display the final map
     plt.figure(figsize=(6, 6))
     plt.imshow(display_map, cmap='gray', origin='lower')
-    plt.title("Final Map (Black = Wall, White = Free Space)")
+    plt.title("Final Map")
     plt.axis('off')  # Turn off axes for cleaner visualization
     plt.show()
