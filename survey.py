@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-from queue import Queue
+from queue import Queue, PriorityQueue
 import random
 import math
 
@@ -76,6 +76,70 @@ def update_map(visible_map, lidar_scan):
         if environment[x, y] == 1:
             visible_map[x, y] = 1  # Mark as obstacle
 
+def find_nearest_frontier(visible_map, robot_pos):
+    rows, cols = visible_map.shape
+    queue = PriorityQueue()
+    queue.put((0, (int(robot_pos[0]), int(robot_pos[1]))))
+    visited = set()
+    visited.add((int(robot_pos[0]), int(robot_pos[1])))
+
+    while not queue.empty():
+        distance, (x, y) = queue.get()
+
+        if visible_map[x, y] == -1:  # Unexplored space
+            return (x, y)
+
+        # Explore neighbors
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < rows and 0 <= ny < cols and (nx, ny) not in visited:
+                if visible_map[nx, ny] != 1 and visible_map[nx, ny] != 2:  # Avoid walls and buffers
+                    queue.put((distance + 1, (nx, ny)))
+                    visited.add((nx, ny))
+    return None  # No frontier found
+
+def weighted_astar(visible_map, start, goal):
+
+    rows, cols = visible_map.shape
+    queue = PriorityQueue()
+    queue.put((0, start))
+    came_from = {}
+    cost_so_far = {}
+    came_from[start] = None
+    cost_so_far[start] = 0
+
+    while not queue.empty():
+        _, current = queue.get()
+
+        if current == goal:
+            break
+
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = current[0] + dx, current[1] + dy
+            if 0 <= nx < rows and 0 <= ny < cols:
+                # Add penalty for buffer zones
+                if visible_map[nx, ny] != 1:  # Free space
+                    new_cost = cost_so_far[current] + 1
+                else:
+                    continue  # Skip walls
+
+                if (nx, ny) not in cost_so_far or new_cost < cost_so_far[(nx, ny)]:
+                    cost_so_far[(nx, ny)] = new_cost
+                    priority = new_cost + abs(nx - goal[0]) + abs(ny - goal[1])
+                    queue.put((priority, (nx, ny)))
+                    came_from[(nx, ny)] = current
+
+    # Reconstruct path
+    path = []
+    current = goal
+    while current != start:
+        path.append(current)
+        current = came_from.get(current)
+        if current is None:  # No path found
+            return None
+    path.reverse()
+    return path
+
 # Path planning using BFS with debugging
 def bfs(visible_map, start):
     rows, cols = visible_map.shape
@@ -109,21 +173,6 @@ def bfs(visible_map, start):
     
     print("No unexplored areas accessible.")
     return None  # No path found
-
-"""
-def store_paths(start, abs_start, end):
-    global local_map_path
-    global abs_map_path
-
-    delta_x, delta_y = end[0] - start[0], end[1] - start[1]
-    center = (grid_size[0] + grid_size[0]//2, grid_size[1] + grid_size[1]//2)
-    local_map_path[center] = 2
-    local_map_path = np.roll(local_map, (delta_x*-1, delta_y*-1), axis=(0,1))
-    local_map_path[center] = 2
-
-    abs_map_path[abs_start] = 2
-    abs_map_path[end] = 2
-"""
 
 def update_position(start, abs_start, end, motion_error=0):
     global local_map
@@ -198,6 +247,7 @@ for step in range(frames):
     update_map(visible_map, lidar_scan)
     
     # Plan path to nearest unexplored area
+    """
     path = bfs(visible_map, robot_pos)
     if path is None:
         print("No more unexplored areas accessible. Stopping simulation.")
@@ -205,9 +255,18 @@ for step in range(frames):
     if len(path) == 1:
         print("Crashed")
         break
+    """
+
+    target = find_nearest_frontier(visible_map, robot_pos)
+    if target is None:
+        print("Exploration complete.")
+        final_map = visible_map.copy()
+        break
+
+    path = weighted_astar(visible_map, (int(robot_pos[0]), int(robot_pos[1])), target)
     
     # Move the robot along the path
-    robot_pos, abs_robot_pos = update_position(robot_pos, abs_robot_pos, path[1], motion_error=0.5)
+    robot_pos, abs_robot_pos = update_position(robot_pos, abs_robot_pos, path[0], motion_error=0.5)
     update_local_map(lidar_scan, robot_pos, abs_robot_pos)
     #store_paths(robot_pos, abs_robot_pos, path[1])
     #TODO: have an if run this every X steps to see a gradient of motion improvement

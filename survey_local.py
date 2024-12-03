@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from queue import Queue
+from queue import PriorityQueue
 import random
 import math
 
@@ -36,7 +37,7 @@ environment = np.zeros(grid_size)  # Ground truth map (0 = free space, 1 = obsta
 visible_map = np.full(grid_size, -1)  # Visible map (-1 = unexplored)
 
 #print(dmap.start)
-robot_pos = dmap.start
+robot_pos = (dmap.start[0], dmap.start[1])
 abs_robot_pos = robot_pos
 
 #mask = np.array(dmap.occupied).transpose()
@@ -66,19 +67,62 @@ def simulate_lidar(environment, robot_pos, lidar_range):
     return lidar_scan
 
 # Update the visible map based on LiDAR data
-def update_map(visible_map, lidar_scan):
+def update_map(map, lidar_scan):
     global environment
 
     for x, y in lidar_scan:
-        if visible_map[x, y] == -1:
-            visible_map[x, y] = 0  # Mark as free space
+        if map[x, y] == -1:
+            map[x, y] = 0  # Mark as free space
         
         if environment[x, y] == 1:
-            visible_map[x, y] = 1  # Mark as obstacle
+            map[x, y] = 1  # Mark as obstacle
+
+    return map
+
+def weighted_astar(visible_map, start, goal):
+    rows, cols = visible_map.shape
+    queue = PriorityQueue()
+    queue.put((0, start))
+    came_from = {}
+    cost_so_far = {}
+    came_from[start] = None
+    cost_so_far[start] = 0
+
+    while not queue.empty():
+        _, current = queue.get()
+
+        if current == goal:
+            break
+
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = current[0] + dx, current[1] + dy
+            if 0 <= nx < rows and 0 <= ny < cols:
+                # Add penalty for buffer zones
+                if visible_map[nx, ny] != 1:  # Free space
+                    new_cost = cost_so_far[current] + 1
+                else:
+                    continue  # Skip walls
+
+                if (nx, ny) not in cost_so_far or new_cost < cost_so_far[(nx, ny)]:
+                    cost_so_far[(nx, ny)] = new_cost
+                    priority = new_cost + abs(nx - goal[0]) + abs(ny - goal[1])
+                    queue.put((priority, (nx, ny)))
+                    came_from[(nx, ny)] = current
+
+    # Reconstruct path
+    path = []
+    current = goal
+    while current != start:
+        path.append(current)
+        current = came_from.get(current)
+        if current is None:  # No path found
+            return None
+    path.reverse()
+    return path
 
 # Path planning using BFS with debugging
-def bfs(visible_map, start):
-    rows, cols = visible_map.shape
+def bfs(map, start):
+    rows, cols = map.shape
     queue = Queue()
     queue.put(start)
     visited = set()
@@ -89,7 +133,7 @@ def bfs(visible_map, start):
         current = queue.get()
         visited.add(tuple(current))
         
-        if visible_map[current[0], current[1]] == -1:
+        if map[current[0], current[1]] == -1:
             # Found unexplored area
             print(f"Unexplored area found at: {current}")
             path = []
@@ -102,7 +146,7 @@ def bfs(visible_map, start):
             nx, ny = current[0] + dx, current[1] + dy
             if (0 <= nx < rows and 0 <= ny < cols and
                 (nx, ny) not in visited and
-                visible_map[nx, ny] != 1):  # Avoid obstacles
+                map[nx, ny] != 1):  # Avoid obstacles
                 queue.put([nx, ny])
                 visited.add((nx, ny))
                 parent[(nx, ny)] = current  # Track parent node
@@ -163,10 +207,10 @@ def update_local_map(scan, robot_pos, abs_robot_pos, lidar_error=0):
     global grid_size
     global environment
 
-    center_scan = [(p[0]-robot_pos[0]+(grid_size[0] + grid_size[0]//2), p[1]-robot_pos[1]+(grid_size[1] + grid_size[1]//2)) for p in scan]
+    #center_scan = [(p[0]-robot_pos[0]+(grid_size[0] + grid_size[0]//2), p[1]-robot_pos[1]+(grid_size[1] + grid_size[1]//2)) for p in scan]
 
-    for i in range(len(center_scan)):
-        local_map[center_scan[i]] = environment[scan[i]]
+    #for i in range(len(center_scan)):
+    #    local_map[center_scan[i]] = environment[scan[i]]
 
     offset_x = robot_pos[0] - abs_robot_pos[0]
     offset_y = robot_pos[1] - abs_robot_pos[1]
@@ -193,12 +237,16 @@ for step in range(frames):
 
     #TODO: find concentric center of points from LiDAR scan to correct motion uncertainty
     #TODO: color motion uncertainty corrections
-        
+    #plt.imshow(local_map_plan, cmap=cmap)
+    #plt.pause(5)
     # Update the visible map
-    update_map(visible_map, lidar_scan)
+    local_map_plan = update_map(local_map_plan, lidar_scan)
+
+    #plt.imshow(local_map_plan, cmap=cmap)
+    #plt.pause(20)
     
     # Plan path to nearest unexplored area
-    path = bfs(visible_map, robot_pos)
+    path = bfs(local_map_plan, robot_pos)
     if path is None:
         print("No more unexplored areas accessible. Stopping simulation.")
         break
@@ -216,7 +264,7 @@ for step in range(frames):
     print(f"Moving robot to: {robot_pos}")
     
     # Visualization
-    img = np.concatenate((visible_map, local_map[grid_size[0] : 2*grid_size[0], grid_size[1] : 2*grid_size[1]]), axis=1)
+    #img = np.concatenate((visible_map, local_map[grid_size[0] : 2*grid_size[0], grid_size[1] : 2*grid_size[1]]), axis=1)
     #img = np.concatenate((img, local_map_plan), axis=1)
 
     #plt.imshow(img, cmap=cmap)
@@ -237,10 +285,7 @@ else:
     #visible_map[x_coords, y_coords] = 0.5
     #img = np.concatenate((visible_map, local_map[grid_size[0] : 2*grid_size[0], grid_size[1] : 2*grid_size[1]]), axis=1)
 
-plt.imshow(visible_map, cmap=cmap)
-plt.pause(5)
-
-plt.imshow(local_map, cmap=cmap)
+plt.imshow(local_map_plan, cmap=cmap)
 plt.pause(5)
 
 
