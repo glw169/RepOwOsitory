@@ -26,6 +26,7 @@ class DiscreteMap():
         self.world_file = world_file
         
         self.occupied = []
+        self.occupied_adjacent = []
         self.num_angles = 72
 
         self.world_dir, self.world_name = os.path.split(self.world_file)
@@ -148,7 +149,7 @@ class DiscreteMap():
             #Add cells from the last expansion to our occupied list
             for p in cur_occupied:
                 if p not in self.occupied:
-                    self.occupied.append(p)
+                    self.occupied_adjacent.append(p)
 
     def draw_grid_rectangle(self,gx,gy,draw,color):
         (x,y) = self.grid_to_image((gx,gy))

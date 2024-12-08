@@ -12,12 +12,12 @@ grid_size = (100, 100)  # Size of the map
 lidar_range = 15  # LiDAR scan range
 robot_pos = [10, 10]  # Starting position of the robot
 abs_robot_pos = robot_pos
-frames = 500  # Maximum simulation steps
+frames = 2000  # Maximum simulation steps
 
 abs_path = []
 visible_path = []
 
-colors = ['black', 'blue', 'lightgray', 'white']
+colors = ['black', 'lightgray', 'white']
 cmap = ListedColormap(colors)
 
 dmap = DiscreteMap(sys.argv[1], 5)
@@ -246,16 +246,6 @@ for step in range(frames):
     # Update the visible map
     update_map(visible_map, lidar_scan)
     
-    # Plan path to nearest unexplored area
-    """
-    path = bfs(visible_map, robot_pos)
-    if path is None:
-        print("No more unexplored areas accessible. Stopping simulation.")
-        break
-    if len(path) == 1:
-        print("Crashed")
-        break
-    """
 
     target = find_nearest_frontier(visible_map, robot_pos)
     if target is None:
